@@ -68,16 +68,20 @@
                 <span class="chart-title"> Top 5 Productos más Vendidos</span>
                 <span class="chart-subtitle">Unidades vendidas en 2025</span>
               </div>
-              <vapexChart type="bar" height="85%" :options="topProductsOptions" :series="topProductsSeries" />
+              <div class="chartjs-wrap">
+                <canvas ref="topProductsCanvas" style="width:100%;height:100%;"></canvas>
+              </div>
             </div>
           </ion-col>
         </ion-row>
+
       </ion-grid>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue';
 import { IonButtons, IonContent, IonHeader, IonMenuButton, IonPage, IonTitle, IonToolbar, IonGrid, IonRow, IonCol } from '@ionic/vue';
 import vapexChart from 'vue3-apexcharts';
 import SparkLine from '@/components/SparkLine.vue';
@@ -144,18 +148,48 @@ const heatmapOptions = {
   tooltip: { theme: 'dark', y: { formatter: (v: number) => `${v} pedidos` } },
 };
 
-const topProductsSeries = [{ name: 'Unidades vendidas', data: [1842, 1634, 1521, 1398, 1247] }];
-const topProductsOptions = {
-  chart: { type: 'bar', background: 'transparent', toolbar: { show: false } },
-  theme: { mode: 'dark' },
-  plotOptions: { bar: { horizontal: true, borderRadius: 6, barHeight: '55%', dataLabels: { position: 'top' } } },
-  colors: ['#4f9cf9'],
-  dataLabels: { enabled: true, offsetX: 5, style: { colors: ['#ccc'], fontSize: '12px' }, formatter: (v: number) => `${v.toLocaleString()} uds` },
-  xaxis: { categories: ['Chaqueta Denim Oversize','Leggings Sport Pro','Sneakers Urban Edge','Camiseta Básica Premium','Sudadera Hoodie Unisex'], labels: { style: { colors: '#aaa' } } },
-  yaxis: { labels: { style: { colors: '#ccc', fontSize: '11px' } } },
-  grid: { borderColor: '#333' },
-  tooltip: { theme: 'dark' },
-};
+// Chart.js — Top 5 Productos (cargado desde CDN)
+const topProductsCanvas = ref<HTMLCanvasElement | null>(null);
+let chartjsInstance: any = null;
+
+function loadScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src; s.onload = () => resolve(); s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function initChartJs() {
+  await loadScript('https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js');
+  const ChartJS = (window as any).Chart;
+  if (!topProductsCanvas.value || !ChartJS) return;
+  chartjsInstance = new ChartJS(topProductsCanvas.value, {
+    type: 'bar',
+    data: {
+      labels: ['Chaqueta Denim', 'Leggings Sport', 'Sneakers Urban', 'Camiseta Premium', 'Hoodie Unisex'],
+      datasets: [{
+        label: 'Unidades vendidas',
+        data: [1842, 1634, 1521, 1398, 1247],
+        backgroundColor: ['#4f9cf9bb','#3ecf8ebb','#f5a623bb','#e879a0bb','#a78bfabb'],
+        borderColor:     ['#4f9cf9',  '#3ecf8e',  '#f5a623',  '#e879a0',  '#a78bfa'],
+        borderWidth: 1, borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx: any) => ` ${ctx.parsed.x.toLocaleString()} uds` } } },
+      scales: {
+        x: { ticks: { color: '#aaa', font: { size: 11 } }, grid: { color: '#333' } },
+        y: { ticks: { color: '#ccc', font: { size: 11 } }, grid: { color: '#222' } }
+      }
+    }
+  });
+}
+onMounted(() => { initChartJs(); });
+onUnmounted(() => { if (chartjsInstance) chartjsInstance.destroy(); });
+
 </script>
 
 <style scoped>
@@ -166,6 +200,7 @@ ion-col { max-height: 100%; --ion-grid-column-padding: 8px; }
 .chart-header { display: flex; flex-direction: column; gap: 2px; padding: 0 8px 8px 8px; }
 .chart-title { font-size: 0.9rem; font-weight: 600; color: #e0e0e0; }
 .chart-subtitle { font-size: 0.72rem; color: #888; }
+.chartjs-wrap { flex: 1; min-height: 0; padding: 4px 8px 8px; position: relative; }
 @media (min-width: 992px) {
   ion-grid { height: 100%; }
   .ion-row-1 { height: 20%; max-height: 20%; }
